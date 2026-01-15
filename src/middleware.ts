@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getCookieName, verifySession } from "@/lib/session";
+import { getCookieName, verifySession } from "./lib/session";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
