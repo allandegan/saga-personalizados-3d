@@ -1,4 +1,4 @@
-import { getCookieName } from "@/lib/session";
+import { getCookieName } from "../../../../lib/session";
 
 export async function POST() {
   const cookie = `${getCookieName()}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${
