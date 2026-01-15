@@ -1,4 +1,4 @@
 {
-  "build": { "builder": "RAILPACK" },
+  "build": { "builder": "NIXPACKS" },
   "deploy": { "startCommand": "npm run start" }
 }
