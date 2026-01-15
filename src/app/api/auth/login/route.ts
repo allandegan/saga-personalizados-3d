@@ -1,5 +1,5 @@
-import { prisma } from "../../../lib/prisma";
-import { signSession, getCookieName } from "../../../lib/session";
+import { prisma } from "../../../../lib/prisma";
+import { signSession, getCookieName } from "../../../../lib/session";
 import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
