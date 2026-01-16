@@ -1,15 +1,16 @@
+import { NextResponse } from "next/server";
 import { getCookieName } from "../../../../lib/session";
 
 export async function POST() {
-  const cookie = `${getCookieName()}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${
-    process.env.NODE_ENV === "production" ? "; Secure" : ""
-  }`;
-
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: {
-      "content-type": "application/json",
-      "set-cookie": cookie
-    }
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set({
+    name: getCookieName(),
+    value: "",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0
   });
+  return res;
 }
