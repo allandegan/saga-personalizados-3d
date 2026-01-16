@@ -10,14 +10,18 @@ export default function LoginPage() {
     const res = await fetch("/api/auth/login", {
   method: "POST",
   headers: { "content-type": "application/json" },
-  body: JSON.stringify({ username, password }),
-  credentials: "include"
+  body: JSON.stringify({ username, password })
 });
-    
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return alert(data.error || "Falha no login");
 
-    window.location.href = "/dashboard/products";
+const data = await res.json();
+
+if (!res.ok) {
+  // mostrar data.error
+  return;
+}
+
+localStorage.setItem("saga_token", data.token);
+window.location.href = "/dashboard/products";
   }
 
   return (
