@@ -27,22 +27,20 @@ export async function POST(req: Request) {
     });
 
     const res = NextResponse.redirect(new URL("/dashboard/products", req.url));
+
     res.cookies.set({
       name: getCookieName(),
       value: token,
       httpOnly: true,
       sameSite: "lax",
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 7 * 24 * 60 * 60
     });
 
     return res;
   } catch (e: any) {
-    // isso faz o erro aparecer no Railway Logs
     console.error("LOGIN-FORM ERROR:", e?.message || e, e);
-
-    // e isso faz aparecer na tela como /login?e=server
     return NextResponse.redirect(new URL("/login?e=server", req.url));
   }
 }
