@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
 import { signSession, getCookieName } from "../../../../lib/session";
 import bcrypt from "bcryptjs";
@@ -9,14 +10,14 @@ export async function POST(req: Request) {
     const password = String(body.password || "");
 
     if (!username || !password) {
-      return Response.json({ error: "Informe usuário e senha." }, { status: 400 });
+      return NextResponse.json({ error: "Informe usuário e senha." }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({ where: { username } });
-    if (!user) return Response.json({ error: "Usuário ou senha inválidos." }, { status: 401 });
+    if (!user) return NextResponse.json({ error: "Usuário ou senha inválidos." }, { status: 401 });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return Response.json({ error: "Usuário ou senha inválidos." }, { status: 401 });
+    if (!ok) return NextResponse.json({ error: "Usuário ou senha inválidos." }, { status: 401 });
 
     const token = await signSession({
       sub: user.id,
@@ -25,18 +26,20 @@ export async function POST(req: Request) {
       username: user.username
     });
 
-    const cookie = `${getCookieName()}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}${
-      process.env.NODE_ENV === "production" ? "; Secure" : ""
-    }`;
+    const res = NextResponse.json({ ok: true });
 
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: {
-        "content-type": "application/json",
-        "set-cookie": cookie
-      }
+    res.cookies.set({
+      name: getCookieName(),
+      value: token,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60
     });
+
+    return res;
   } catch (e) {
-    return Response.json({ error: "Erro no login." }, { status: 500 });
+    return NextResponse.json({ error: "Erro no login." }, { status: 500 });
   }
 }
