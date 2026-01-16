@@ -1,25 +1,21 @@
-<div style={{ marginBottom: 10, padding: 8, borderRadius: 10, background: "#ecfeff", border: "1px solid #a5f3fc", fontWeight: 900 }}>
-  LOGIN FORM V2 (sem JS)
-</div>
-
-const msg =
-  e === "missing" ? "Informe usuário e senha." :
-  e === "invalid" ? "Usuário ou senha inválidos." :
-  e === "server" ? "Erro interno no login (500). Vou precisar do log do Railway para corrigir." :
-  null;
-
 export default function LoginPage({ searchParams }: { searchParams?: { e?: string } }) {
   const e = searchParams?.e;
 
   const msg =
     e === "missing" ? "Informe usuário e senha." :
     e === "invalid" ? "Usuário ou senha inválidos." :
+    e === "server" ? "Erro interno no login (500). Vou precisar do log do Railway para corrigir." :
     null;
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#f3f4f6", padding: 16 }}>
       <div style={{ width: "100%", maxWidth: 420, background: "white", borderRadius: 16, padding: 18, boxShadow: "0 1px 12px rgba(0,0,0,0.06)" }}>
         <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 6 }}>S.A.G.A Personalizados 3D</div>
+
+        <div style={{ marginBottom: 10, padding: 8, borderRadius: 10, background: "#ecfeff", border: "1px solid #a5f3fc", fontWeight: 900 }}>
+          LOGIN FORM V2 (sem JS)
+        </div>
+
         <div style={{ color: "#6b7280", marginBottom: 16 }}>Acesse com seu usuário e senha</div>
 
         {msg ? (
