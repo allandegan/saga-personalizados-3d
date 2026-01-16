@@ -1,11 +1,11 @@
-import { cookies } from "next/headers";
-import { getCookieName, verifySession } from "../../../../lib/session";
+import { verifySession } from "../../../../lib/session";
 
-export async function GET() {
-  const token = cookies().get(getCookieName())?.value;
+export async function GET(req: Request) {
+  const auth = req.headers.get("authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
 
   if (!token) {
-    return Response.json({ ok: false, logged: false, reason: "no_cookie" }, { status: 200 });
+    return Response.json({ ok: false, logged: false, reason: "no_token" }, { status: 200 });
   }
 
   try {
@@ -13,7 +13,7 @@ export async function GET() {
     return Response.json({ ok: true, logged: true, user: payload }, { status: 200 });
   } catch (e: any) {
     return Response.json(
-      { ok: false, logged: false, reason: "invalid_cookie", error: String(e?.message || e) },
+      { ok: false, logged: false, reason: "invalid_token", error: String(e?.message || e) },
       { status: 200 }
     );
   }
