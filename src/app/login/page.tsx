@@ -2,6 +2,12 @@
   LOGIN FORM V2 (sem JS)
 </div>
 
+const msg =
+  e === "missing" ? "Informe usuário e senha." :
+  e === "invalid" ? "Usuário ou senha inválidos." :
+  e === "server" ? "Erro interno no login (500). Vou precisar do log do Railway para corrigir." :
+  null;
+
 export default function LoginPage({ searchParams }: { searchParams?: { e?: string } }) {
   const e = searchParams?.e;
 
