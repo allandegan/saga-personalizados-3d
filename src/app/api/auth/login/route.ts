@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../../../lib/prisma";
-import { signSession, getCookieName } from "../../../../lib/session";
+import { signSession } from "../../../../lib/session";
 import bcrypt from "bcryptjs";
 
 export async function POST(req: Request) {
@@ -26,20 +26,9 @@ export async function POST(req: Request) {
       username: user.username
     });
 
-    const res = NextResponse.json({ ok: true });
-
-    res.cookies.set({
-      name: getCookieName(),
-      value: token,
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60
-    });
-
-    return res;
-  } catch (e) {
+    // agora devolve o token no JSON
+    return NextResponse.json({ ok: true, token });
+  } catch {
     return NextResponse.json({ error: "Erro no login." }, { status: 500 });
   }
 }
