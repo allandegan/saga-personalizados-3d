@@ -1,3 +1,7 @@
+<div style={{ marginBottom: 10, padding: 8, borderRadius: 10, background: "#ecfeff", border: "1px solid #a5f3fc", fontWeight: 900 }}>
+  LOGIN FORM V2 (sem JS)
+</div>
+
 export default function LoginPage({ searchParams }: { searchParams?: { e?: string } }) {
   const e = searchParams?.e;
 
