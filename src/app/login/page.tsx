@@ -8,11 +8,12 @@ export default function LoginPage() {
 
   async function onSubmit() {
     const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username, password })
-    });
-
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ username, password }),
+  credentials: "include"
+});
+    
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return alert(data.error || "Falha no login");
 
