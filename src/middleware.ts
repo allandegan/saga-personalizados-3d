@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getCookieName, verifySession } from "@/lib/session";
+import { getCookieName, verifySession } from "./lib/session";
 
 function getPublicOrigin(req: NextRequest) {
   const xfProto = req.headers.get("x-forwarded-proto");

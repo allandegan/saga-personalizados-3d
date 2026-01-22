@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/prisma";
-import { signSession, getCookieName } from "@/lib/session";
 import bcrypt from "bcryptjs";
+import { prisma } from "../../../../lib/prisma";
+import { signSession, getCookieName } from "../../../../lib/session";
 
 export async function POST(req: Request) {
   try {
