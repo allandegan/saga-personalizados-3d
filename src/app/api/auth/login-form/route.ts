@@ -1,23 +1,23 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { prisma } from "../../../../lib/prisma";
-import { signSession, getCookieName } from "../../../../lib/session";
+import { prisma } from "@/lib/prisma";
+import { signSession, getCookieName } from "@/lib/session";
 
 export async function POST(req: Request) {
   try {
-    const form = await req.formData();
-    const username = String(form.get("username") || "").trim();
-    const password = String(form.get("password") || "");
+    const body = await req.json().catch(() => ({}));
+    const username = String(body.username || "").trim();
+    const password = String(body.password || "");
 
     if (!username || !password) {
-      return NextResponse.redirect(new URL("/login?e=missing", req.url));
+      return NextResponse.json({ ok: false, error: "Informe usuário e senha." }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({ where: { username } });
-    if (!user) return NextResponse.redirect(new URL("/login?e=invalid", req.url));
+    if (!user) return NextResponse.json({ ok: false, error: "Usuário ou senha inválidos." }, { status: 401 });
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) return NextResponse.redirect(new URL("/login?e=invalid", req.url));
+    if (!ok) return NextResponse.json({ ok: false, error: "Usuário ou senha inválidos." }, { status: 401 });
 
     const token = await signSession({
       sub: user.id,
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       username: user.username
     });
 
-    const res = NextResponse.redirect(new URL("/dashboard/products", req.url));
+    const res = NextResponse.json({ ok: true }, { status: 200 });
 
     res.cookies.set({
       name: getCookieName(),
@@ -39,8 +39,7 @@ export async function POST(req: Request) {
     });
 
     return res;
-  } catch (e: any) {
-    console.error("LOGIN-FORM ERROR:", e?.message || e, e);
-    return NextResponse.redirect(new URL("/login?e=server", req.url));
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: "Erro no login." }, { status: 500 });
   }
 }
