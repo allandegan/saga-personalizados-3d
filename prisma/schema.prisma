@@ -9,8 +9,8 @@ datasource db {
 
 enum Role {
   ADMIN
-  OPERATOR
-  VIEWER
+  OPERADOR
+  CONSULTA
 }
 
 model User {
@@ -22,18 +22,32 @@ model User {
   createdAt    DateTime @default(now())
 }
 
-model Product {
-  id           String   @id @default(cuid())
-  name         String
-  price        Float
-  createdAt    DateTime @default(now())
-model Product {
+model Category {
   id        String   @id @default(cuid())
-  name      String
-  unitPrice Decimal  @db.Decimal(10, 2)
-  active    Boolean  @default(true)
+  name      String   @unique
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  products  Product[]
 }
 
+model Product {
+  id         String   @id @default(cuid())
+  name       String
+  price      Float
+  categoryId String?
+  createdAt  DateTime @default(now())
+
+  category   Category? @relation(fields: [categoryId], references: [id])
+  history    PriceHistory[]
+}
+
+model PriceHistory {
+  id        String   @id @default(cuid())
+  productId String
+  oldPrice  Float
+  newPrice  Float
+  note      String?
+  changedAt DateTime @default(now())
+
+  product   Product  @relation(fields: [productId], references: [id])
 }
