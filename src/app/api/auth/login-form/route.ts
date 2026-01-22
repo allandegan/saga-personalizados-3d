@@ -28,19 +28,14 @@ export async function POST(req: Request) {
 
     const cookieName = getCookieName();
 
-    const res = NextResponse.json(
-      { ok: true, cookieName },
-      { status: 200 }
-    );
+    const cookie = `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}${
+      process.env.NODE_ENV === "production" ? "; Secure" : ""
+    }`;
 
-    // ✅ Forma mais compatível possível (Railway + Chrome)
-    res.cookies.set(cookieName, token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60
-    });
+    const res = NextResponse.json({ ok: true }, { status: 200 });
+
+    // ✅ garante que o browser vai receber cookie
+    res.headers.set("set-cookie", cookie);
 
     return res;
   } catch (e) {
