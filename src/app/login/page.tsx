@@ -1,11 +1,43 @@
-export default function LoginPage({ searchParams }: { searchParams?: { e?: string } }) {
-  const e = searchParams?.e;
+"use client";
 
-  const msg =
-    e === "missing" ? "Informe usuário e senha." :
-    e === "invalid" ? "Usuário ou senha inválidos." :
-    e === "server" ? "Erro interno no login (500). Veja o log do Railway." :
-    null;
+import { useState } from "react";
+
+export default function LoginPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function onSubmit() {
+    setErr(null);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/login-form", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          username: username.trim(),
+          password
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.ok) {
+        setErr(data?.error || "Falha no login.");
+        return;
+      }
+
+      // Login OK -> vai para produtos
+      window.location.href = "/dashboard/products";
+    } catch (e) {
+      setErr("Erro de rede no login.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#f3f4f6", padding: 16 }}>
@@ -13,27 +45,57 @@ export default function LoginPage({ searchParams }: { searchParams?: { e?: strin
         <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 6 }}>S.A.G.A Personalizados 3D</div>
         <div style={{ color: "#6b7280", marginBottom: 16 }}>Acesse com seu usuário e senha</div>
 
-        {msg ? (
-          <div style={{ marginBottom: 12, padding: 10, borderRadius: 10, border: "1px solid #fecaca", background: "#fef2f2", color: "#991b1b", fontWeight: 700 }}>
-            {msg}
+        {err ? (
+          <div style={{ background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, marginBottom: 12, fontSize: 13, fontWeight: 700 }}>
+            {err}
           </div>
         ) : null}
 
-        <form method="POST" action="/api/auth/login-form" style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "grid", gap: 12 }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 6 }}>Usuário</div>
-            <input name="username" autoComplete="username" style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb" }} />
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="ex: Allan"
+              autoComplete="username"
+              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb", outline: "none" }}
+            />
           </div>
 
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", marginBottom: 6 }}>Senha</div>
-            <input type="password" name="password" autoComplete="current-password" style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb" }} />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb", outline: "none" }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onSubmit();
+              }}
+            />
           </div>
 
-          <button type="submit" style={{ cursor: "pointer", borderRadius: 10, padding: "10px 12px", fontWeight: 800, background: "#111827", color: "white", border: "1px solid transparent" }}>
-            Entrar
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={loading}
+            style={{
+              cursor: loading ? "not-allowed" : "pointer",
+              border: "1px solid transparent",
+              borderRadius: 10,
+              padding: "10px 12px",
+              fontWeight: 800,
+              background: "#111827",
+              color: "white",
+              opacity: loading ? 0.7 : 1
+            }}
+          >
+            {loading ? "Entrando..." : "Entrar"}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );
