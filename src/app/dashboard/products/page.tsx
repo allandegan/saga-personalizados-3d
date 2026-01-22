@@ -4,87 +4,100 @@ import { useEffect, useMemo, useState } from "react";
 
 type Role = "ADMIN" | "OPERADOR" | "CONSULTA";
 
+type Category = { id: string; name: string };
+
 type Product = {
   id: string;
   name: string;
   price: number;
-  category?: { id: string; name: string } | null;
   createdAt: string;
+  category?: { id: string; name: string } | null;
 };
 
 export default function ProductsPage() {
-  const [me, setMe] = useState<{ name: string; role: Role } | null>(null);
-  const [loadingMe, setLoadingMe] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [boot, setBoot] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [me, setMe] = useState<{ role: Role; name: string; username: string } | null>(null);
 
   const [items, setItems] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [cats, setCats] = useState<Category[]>([]);
 
   const [name, setName] = useState("");
-  const [priceInput, setPriceInput] = useState("");
+  const [unitPrice, setUnitPrice] = useState("");
+  const [categoryId, setCategoryId] = useState<string>("");
 
-  const canEdit = me?.role === "ADMIN" || me?.role === "OPERADOR";
+  const isAdmin = me?.role === "ADMIN";
+  const isOperador = me?.role === "OPERADOR";
+  const isConsulta = me?.role === "CONSULTA";
 
-  function formatBRL(v: number) {
-    return v.toFixed(2).replace(".", ",");
-  }
+  const canCreate = isAdmin || isOperador; // B
+  const canEditNameCategory = isAdmin || isOperador; // B
+  const canEditPrice = isAdmin; // B
 
-  function parsePriceBR(s: string) {
-    // aceita "19,90" ou "19.90"
-    const norm = String(s || "")
+  function parseBRL(s: string) {
+    const raw = String(s || "")
       .trim()
       .replace(/\s/g, "")
-      .replace(".", "")
+      .replace(/^R\$\s*/i, "")
+      .replace(/\./g, "")
       .replace(",", ".");
-    const n = Number(norm);
+    const n = Number(raw);
     return Number.isFinite(n) ? n : NaN;
   }
 
-  async function load() {
-    const r = await fetch("/api/products", { cache: "no-store", credentials: "include" });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j?.ok) {
-      setMsg(j?.error || "Erro ao carregar produtos.");
-      return;
-    }
-    setItems(j.items || []);
-  }
+  async function loadAll() {
+    setError(null);
+    try {
+      const [rMe, rCats, rProds] = await Promise.all([
+        fetch("/api/auth/me", { cache: "no-store" }),
+        fetch("/api/categories", { cache: "no-store" }),
+        fetch("/api/products", { cache: "no-store" })
+      ]);
 
-  useEffect(() => {
-    (async () => {
-      setLoadingMe(true);
-      const r = await fetch("/api/auth/me", { cache: "no-store", credentials: "include" });
-      const j = await r.json().catch(() => ({}));
-
-      if (!r.ok || !j?.logged) {
+      const jMe = await rMe.json().catch(() => ({}));
+      if (!jMe?.logged) {
         window.location.href = "/login";
         return;
       }
+      setMe(jMe.user);
 
-      setMe({ name: j.user?.name || "Usuário", role: j.user?.role });
-      setLoadingMe(false);
+      const jCats = await rCats.json().catch(() => ({}));
+      if (jCats?.ok) setCats(jCats.items || []);
 
-      // carrega produtos
-      await load();
-    })();
+      const jProds = await rProds.json().catch(() => ({}));
+      if (jProds?.ok) setItems(jProds.items || []);
+      else setError(jProds?.error || "Erro ao carregar produtos.");
+    } catch {
+      setError("Erro ao carregar dados.");
+    } finally {
+      setBoot(false);
+    }
+  }
+
+  useEffect(() => {
+    loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function add() {
-    setMsg(null);
+    setError(null);
 
-    if (!canEdit) {
-      setMsg("Você não tem permissão para cadastrar.");
+    if (!canCreate) {
+      setError("Seu perfil é CONSULTA. Você não pode cadastrar.");
       return;
     }
 
-    const p = parsePriceBR(priceInput);
-    if (!name.trim()) {
-      setMsg("Informe o nome do produto.");
+    const nm = name.trim();
+    const price = parseBRL(unitPrice);
+
+    if (!nm) {
+      setError("Informe o nome do produto.");
       return;
     }
-    if (!Number.isFinite(p)) {
-      setMsg("Informe um preço válido (ex: 19,90).");
+    if (!Number.isFinite(price)) {
+      setError("Preço inválido. Ex: 19,90");
       return;
     }
 
@@ -93,148 +106,338 @@ export default function ProductsPage() {
       const r = await fetch("/api/products", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name: name.trim(), price: p })
+        body: JSON.stringify({
+          name: nm,
+          unitPrice: price,
+          categoryId: categoryId || null
+        })
       });
 
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j?.ok) {
-        setMsg(j?.error || "Erro ao salvar produto.");
+        setError(j?.error || "Erro ao cadastrar produto.");
         return;
       }
 
       setName("");
-      setPriceInput("");
-      await load();
+      setUnitPrice("");
+      setCategoryId("");
+      await loadAll();
     } finally {
       setLoading(false);
     }
   }
 
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
-    window.location.href = "/login";
+  async function rename(p: Product) {
+    if (!canEditNameCategory) return;
+
+    const newName = window.prompt("Novo nome do produto:", p.name);
+    if (newName === null) return;
+    const nm = newName.trim();
+    if (!nm) return alert("Nome inválido.");
+
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/products/${p.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: nm })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) {
+        setError(j?.error || "Erro ao renomear.");
+        return;
+      }
+      await loadAll();
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const rows = useMemo(() => items, [items]);
+  async function changeCategory(p: Product) {
+    if (!canEditNameCategory) return;
 
-  if (loadingMe) {
-    return <div style={{ padding: 18, fontFamily: "system-ui" }}>Carregando...</div>;
+    const current = p.category?.id || "";
+    const options = ["(sem categoria)", ...cats.map((c) => c.name)];
+    const pick = window.prompt(
+      `Digite o nome da categoria exatamente como está na lista:\n\n${options.join("\n")}\n\nCategoria atual: ${
+        p.category?.name || "(sem)"
+      }`,
+      p.category?.name || ""
+    );
+    if (pick === null) return;
+
+    const chosen = pick.trim();
+    const cat =
+      chosen === "" || chosen === "(sem categoria)" || chosen === "(sem)"
+        ? null
+        : cats.find((c) => c.name.toLowerCase() === chosen.toLowerCase()) || null;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/products/${p.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ categoryId: cat ? cat.id : null })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) {
+        setError(j?.error || "Erro ao alterar categoria.");
+        return;
+      }
+      await loadAll();
+    } finally {
+      setLoading(false);
+    }
   }
+
+  async function changePrice(p: Product) {
+    if (!canEditPrice) return;
+
+    const current = Number(p.price).toFixed(2).replace(".", ",");
+    const raw = window.prompt("Novo preço (ex: 19,90):", current);
+    if (raw === null) return;
+
+    const price = parseBRL(raw);
+    if (!Number.isFinite(price)) return alert("Preço inválido. Ex: 19,90");
+
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/products/${p.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ unitPrice: price })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) {
+        setError(j?.error || "Erro ao alterar preço.");
+        return;
+      }
+      await loadAll();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const money = useMemo(() => {
+    return (n: number) => `R$ ${Number(n).toFixed(2).replace(".", ",")}`;
+  }, []);
+
+  if (boot) {
+    return (
+      <div style={{ padding: 18 }}>
+        <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 6 }}>Produtos</div>
+        <div style={{ color: "#6b7280" }}>Carregando...</div>
+      </div>
+    );
+  }
+
+  const td = () => ({
+    padding: "10px 10px",
+    borderBottom: "1px solid #e5e7eb",
+    verticalAlign: "top" as const
+  });
 
   return (
-    <div style={{ padding: 18, fontFamily: "system-ui" }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+    <div style={{ padding: 4 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 900 }}>S.A.G.A Personalizados 3D</div>
-          <div style={{ color: "#6b7280", fontSize: 13 }}>
-            Logado como <b>{me?.name}</b> ({me?.role})
+          <div style={{ fontWeight: 900, fontSize: 20 }}>Produtos</div>
+          <div style={{ color: "#6b7280", fontSize: 12 }}>
+            Perfil: <b>{me?.role}</b> • {me?.name}
           </div>
         </div>
 
         <button
-          onClick={logout}
+          onClick={loadAll}
           style={{
             cursor: "pointer",
             borderRadius: 10,
-            padding: "10px 12px",
-            fontWeight: 800,
+            padding: "8px 10px",
+            fontWeight: 900,
             border: "1px solid #e5e7eb",
             background: "white"
           }}
         >
-          Sair
+          Recarregar
         </button>
       </div>
 
-      {msg ? (
-        <div style={{ marginTop: 14, background: "#fee2e2", color: "#991b1b", padding: 10, borderRadius: 10, fontSize: 13, fontWeight: 700 }}>
-          {msg}
+      {error ? (
+        <div style={{ marginBottom: 12, padding: 10, borderRadius: 10, border: "1px solid #fecaca", background: "#fff1f2", color: "#991b1b" }}>
+          {error}
         </div>
       ) : null}
 
-      <div style={{ marginTop: 16, display: "grid", gap: 10, padding: 14, border: "1px solid #e5e7eb", borderRadius: 12 }}>
-        <div style={{ fontWeight: 900 }}>Cadastrar produto</div>
+      {/* Formulário: somente ADMIN/OPERADOR */}
+      {canCreate ? (
+        <div style={{ marginBottom: 14, padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", background: "white" }}>
+          <div style={{ fontWeight: 900, marginBottom: 10 }}>Cadastrar produto</div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 180px 140px", gap: 10, alignItems: "end" }}>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#6b7280", marginBottom: 6 }}>Nome</div>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="ex: Chaveiro PLA"
-              disabled={!canEdit}
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb", outline: "none" }}
-            />
+          <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.6fr 0.8fr 0.4fr", gap: 10, alignItems: "end" }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#6b7280", marginBottom: 6 }}>Nome</div>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex: Chaveiro PLA"
+                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb", outline: "none" }}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#6b7280", marginBottom: 6 }}>Preço</div>
+              <input
+                value={unitPrice}
+                onChange={(e) => setUnitPrice(e.target.value)}
+                placeholder="Ex: 19,90"
+                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb", outline: "none" }}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#6b7280", marginBottom: 6 }}>Categoria</div>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb", outline: "none", background: "white" }}
+              >
+                <option value="">(sem categoria)</option>
+                {cats.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              disabled={loading}
+              onClick={add}
+              style={{
+                cursor: loading ? "not-allowed" : "pointer",
+                borderRadius: 10,
+                padding: "10px 12px",
+                fontWeight: 900,
+                border: "1px solid transparent",
+                background: "#111827",
+                color: "white",
+                opacity: loading ? 0.7 : 1
+              }}
+            >
+              {loading ? "Salvando..." : "Cadastrar"}
+            </button>
           </div>
-
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#6b7280", marginBottom: 6 }}>Preço (R$)</div>
-            <input
-              value={priceInput}
-              onChange={(e) => setPriceInput(e.target.value)}
-              placeholder="ex: 19,90"
-              disabled={!canEdit}
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #e5e7eb", outline: "none" }}
-            />
-          </div>
-
-          <button
-            onClick={add}
-            disabled={!canEdit || loading}
-            style={{
-              cursor: !canEdit || loading ? "not-allowed" : "pointer",
-              border: "1px solid transparent",
-              borderRadius: 10,
-              padding: "10px 12px",
-              fontWeight: 900,
-              background: "#111827",
-              color: "white",
-              opacity: !canEdit || loading ? 0.6 : 1
-            }}
-          >
-            {loading ? "Salvando..." : "Salvar"}
-          </button>
         </div>
+      ) : (
+        <div style={{ marginBottom: 14, padding: 12, borderRadius: 12, border: "1px solid #e5e7eb", background: "white", color: "#6b7280" }}>
+          Você está em modo <b>CONSULTA</b>. Pode apenas visualizar.
+        </div>
+      )}
 
-        {!canEdit ? <div style={{ color: "#6b7280", fontSize: 12 }}>Seu perfil é somente consulta.</div> : null}
-      </div>
+      {/* Tabela */}
+      <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden", background: "white" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#f9fafb" }}>
+              <th style={{ ...td(), textAlign: "left", fontSize: 12, color: "#6b7280" }}>Produto</th>
+              <th style={{ ...td(), textAlign: "left", fontSize: 12, color: "#6b7280" }}>Categoria</th>
+              <th style={{ ...td(), textAlign: "left", fontSize: 12, color: "#6b7280" }}>Preço</th>
+              <th style={{ ...td(), textAlign: "left", fontSize: 12, color: "#6b7280" }}>Criado em</th>
+              <th style={{ ...td(), textAlign: "left", fontSize: 12, color: "#6b7280", width: 340 }}>Ações</th>
+            </tr>
+          </thead>
 
-      <div style={{ marginTop: 16, padding: 14, border: "1px solid #e5e7eb", borderRadius: 12 }}>
-        <div style={{ fontWeight: 900, marginBottom: 10 }}>Tabela de preços</div>
-
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-            <thead>
+          <tbody>
+            {items.length === 0 ? (
               <tr>
-                <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "10px 8px" }}>Produto</th>
-                <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "10px 8px" }}>Preço</th>
-                <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "10px 8px" }}>Categoria</th>
-                <th style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb", padding: "10px 8px" }}>Criado em</th>
+                <td style={td()} colSpan={5}>
+                  <div style={{ padding: 10, color: "#6b7280" }}>Nenhum produto cadastrado ainda.</div>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={4} style={{ padding: 12, color: "#6b7280" }}>
-                    Nenhum produto cadastrado ainda.
+            ) : (
+              items.map((p) => (
+                <tr key={p.id}>
+                  <td style={td()}>
+                    <div style={{ fontWeight: 900 }}>{p.name}</div>
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>{p.id}</div>
+                  </td>
+
+                  <td style={td()}>{p.category?.name || <span style={{ color: "#6b7280" }}>(sem)</span>}</td>
+
+                  <td style={td()}>{money(p.price)}</td>
+
+                  <td style={td()}>{new Date(p.createdAt).toLocaleString("pt-BR")}</td>
+
+                  <td style={td()}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {/* CONSULTA não vê botões */}
+                      {canEditNameCategory ? (
+                        <>
+                          <button
+                            onClick={() => rename(p)}
+                            style={{
+                              cursor: "pointer",
+                              borderRadius: 10,
+                              padding: "8px 10px",
+                              fontWeight: 900,
+                              border: "1px solid #e5e7eb",
+                              background: "white"
+                            }}
+                          >
+                            Nome
+                          </button>
+
+                          <button
+                            onClick={() => changeCategory(p)}
+                            style={{
+                              cursor: "pointer",
+                              borderRadius: 10,
+                              padding: "8px 10px",
+                              fontWeight: 900,
+                              border: "1px solid #e5e7eb",
+                              background: "white"
+                            }}
+                          >
+                            Categoria
+                          </button>
+                        </>
+                      ) : null}
+
+                      {/* Preço só ADMIN (Regra B) */}
+                      {canEditPrice ? (
+                        <button
+                          onClick={() => changePrice(p)}
+                          style={{
+                            cursor: "pointer",
+                            borderRadius: 10,
+                            padding: "8px 10px",
+                            fontWeight: 900,
+                            border: "1px solid #111827",
+                            background: "#111827",
+                            color: "white"
+                          }}
+                        >
+                          Preço
+                        </button>
+                      ) : null}
+
+                      {/* Dica pro operador */}
+                      {isOperador ? (
+                        <span style={{ fontSize: 12, color: "#6b7280", alignSelf: "center" }}>
+                          (Operador não altera preço)
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
-              ) : (
-                rows.map((p) => (
-                  <tr key={p.id}>
-                    <td style={{ borderBottom: "1px solid #f3f4f6", padding: "10px 8px", fontWeight: 700 }}>{p.name}</td>
-                    <td style={{ borderBottom: "1px solid #f3f4f6", padding: "10px 8px" }}>R$ {formatBRL(Number(p.price))}</td>
-                    <td style={{ borderBottom: "1px solid #f3f4f6", padding: "10px 8px" }}>{p.category?.name || "-"}</td>
-                    <td style={{ borderBottom: "1px solid #f3f4f6", padding: "10px 8px", color: "#6b7280" }}>
-                      {p.createdAt ? new Date(p.createdAt).toLocaleString("pt-BR") : "-"}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

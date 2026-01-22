@@ -1,49 +1,58 @@
-import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import readline from "node:readline";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-function ask(question) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  return new Promise((resolve) =>
-    rl.question(question, (ans) => {
-      rl.close();
-      resolve(ans.trim());
-    })
-  );
-}
-
-async function main() {
-  const name = await ask("Nome: ");
-  const username = await ask("Usuario (login): ");
-  const password = await ask("Senha: ");
-
-  if (!name || !username || !password) {
-    console.error("Preencha nome, usuario e senha.");
-    process.exit(1);
-  }
-
+async function upsertUser({ name, username, password, role }) {
   const passwordHash = await bcrypt.hash(password, 10);
-
-  const existingCount = await prisma.user.count();
-  if (existingCount >= 5) {
-    console.error("Limite de 5 usuarios atingido.");
-    process.exit(1);
-  }
 
   const user = await prisma.user.upsert({
     where: { username },
-    update: { name, passwordHash, role: "ADMIN" },
-    create: { name, username, passwordHash, role: "ADMIN" }
+    update: {
+      name,
+      role,
+      passwordHash
+    },
+    create: {
+      name,
+      username,
+      role,
+      passwordHash
+    },
+    select: { id: true, name: true, username: true, role: true, createdAt: true }
   });
 
-  console.log(`OK: ADMIN criado/atualizado -> ${user.username}`);
+  return user;
+}
+
+async function main() {
+  const users = [];
+
+  users.push(
+    await upsertUser({
+      name: "Allan",
+      username: "Allan",
+      password: "@Degan_2023",
+      role: "ADMIN"
+    })
+  );
+
+  users.push(
+    await upsertUser({
+      name: "Giselle",
+      username: "Gisa",
+      password: "Gisa170321@",
+      role: "ADMIN"
+    })
+  );
+
+  console.log("✅ Admins criados/atualizados:");
+  console.table(users);
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error("❌ Erro no seed:", e);
     process.exit(1);
   })
   .finally(async () => {
