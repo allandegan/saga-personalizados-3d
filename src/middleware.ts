@@ -5,33 +5,25 @@ import { getCookieName } from "./lib/session";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Rotas públicas / assets
+  // ✅ Sempre liberar rotas públicas e todas APIs de auth
   if (
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/api/auth/login") ||
-    pathname.startsWith("/api/auth/login-form") ||
-    pathname.startsWith("/api/auth/logout") ||
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico"
   ) {
     return NextResponse.next();
   }
 
-  // ✅ No middleware (Edge) só checa existência do cookie
-  const token = req.cookies.get(getCookieName())?.value;
-  if (!token) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = "";
-    return NextResponse.redirect(url);
-  }
-
-  // Raiz -> dashboard
-  if (pathname === "/") {
-    const url = req.nextUrl.clone();
-    url.pathname = "/dashboard/products";
-    url.search = "";
-    return NextResponse.redirect(url);
+  // ✅ Proteger apenas /dashboard
+  if (pathname.startsWith("/dashboard")) {
+    const token = req.cookies.get(getCookieName())?.value;
+    if (!token) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
   }
 
   return NextResponse.next();
