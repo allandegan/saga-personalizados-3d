@@ -6,11 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p $PORT"
+    "start": "next start -H 0.0.0.0 -p $PORT",
     "lint": "next lint",
-    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "seed:admins": "node scripts/seed-admin.mjs"
   },
