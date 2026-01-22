@@ -26,11 +26,15 @@ export async function POST(req: Request) {
       username: user.username
     });
 
-    const res = NextResponse.json({ ok: true }, { status: 200 });
+    const cookieName = getCookieName();
 
-    res.cookies.set({
-      name: getCookieName(),
-      value: token,
+    const res = NextResponse.json(
+      { ok: true, cookieName },
+      { status: 200 }
+    );
+
+    // ✅ Forma mais compatível possível (Railway + Chrome)
+    res.cookies.set(cookieName, token, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
