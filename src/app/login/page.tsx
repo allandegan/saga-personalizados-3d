@@ -13,26 +13,23 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login-form", {
+      const r = await fetch("/api/auth/login-form", {
         method: "POST",
         headers: { "content-type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          username: username.trim(),
-          password
-        })
+        body: JSON.stringify({ username: username.trim(), password })
       });
 
-      const data = await res.json().catch(() => ({}));
+      const j = await r.json().catch(() => ({}));
 
-      if (!res.ok || !data?.ok) {
-        setErr(data?.error || "Falha no login.");
+      if (!r.ok || !j?.ok) {
+        setErr(j?.error || "Falha no login.");
         return;
       }
 
-      // Login OK -> vai para produtos
+      // ✅ aqui NÃO usa token, só redireciona
       window.location.href = "/dashboard/products";
-    } catch (e) {
+    } catch {
       setErr("Erro de rede no login.");
     } finally {
       setLoading(false);

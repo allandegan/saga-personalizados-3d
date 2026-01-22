@@ -2,40 +2,36 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getCookieName } from "./lib/session";
 
-function getPublicOrigin(req: NextRequest) {
-  const xfProto = req.headers.get("x-forwarded-proto");
-  const xfHost = req.headers.get("x-forwarded-host");
-  const host = xfHost || req.headers.get("host") || "localhost";
-  const proto = xfProto || "https";
-  return `${proto}://${host}`;
-}
-
-export async function middleware(req: NextRequest) {
+export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // liberar rotas públicas e assets
+  // Rotas públicas / assets
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth/login") ||
     pathname.startsWith("/api/auth/login-form") ||
     pathname.startsWith("/api/auth/logout") ||
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon.ico")
+    pathname === "/favicon.ico"
   ) {
     return NextResponse.next();
   }
 
-  // ✅ No Edge, não valida JWT (evita loop). Só checa se tem cookie.
+  // ✅ No middleware (Edge) só checa existência do cookie
   const token = req.cookies.get(getCookieName())?.value;
   if (!token) {
-    const origin = getPublicOrigin(req);
-    return NextResponse.redirect(new URL("/login", origin));
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    url.search = "";
+    return NextResponse.redirect(url);
   }
 
-  // raiz -> manda pro dashboard
+  // Raiz -> dashboard
   if (pathname === "/") {
-    const origin = getPublicOrigin(req);
-    return NextResponse.redirect(new URL("/dashboard/products", origin));
+    const url = req.nextUrl.clone();
+    url.pathname = "/dashboard/products";
+    url.search = "";
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();
